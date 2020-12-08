@@ -10,7 +10,8 @@ model_num = as.integer(args)
 run_settings = read_rds("model_settings.rds")[model_num,]
 
 copepods = read_csv("data/chapter2.copepods.cleaned.csv") %>% 
-  mutate(native = cop.lake == worm.lake)
+  mutate(native = cop.lake == worm.lake,
+         genus = if_else(cop.lake %in% c("gos", "ech"), "A", "M" )) # This is where you'd want to define "genus"
 
 ## Function to run models ====================
 run_hurdle_model = function(formula, priors, name,
@@ -50,8 +51,4 @@ divergences =  nuts_params(fit, pars = "divergent__")$Value
 # Get LOO info
 looic = brms::loo(fit, cores = N_CORES, reloo = TRUE)
 write_rds(looic, file.path("out/loo", paste0(run_settings$name, ".rds")))
-
-
-
-# I apologize for my general lack of contact; it's asdf 
-# 
+ 
