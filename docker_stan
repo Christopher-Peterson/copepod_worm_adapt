@@ -1,0 +1,10 @@
+#!/bin/bash
+module load tacc-singularity 
+module unload xalt
+module load gcc
+
+# Change this to the location you downloaded the singularity image to
+singularity exec /work/04386/crpeters/stampede2/singularity/docker-stan_21.1.2.sif Rscript "$@"
+
+module unload gcc
+module load xalt
