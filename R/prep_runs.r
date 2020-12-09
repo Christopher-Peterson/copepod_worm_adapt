@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
 # library(tidybayes)
 # library(cowplot)
 # This sets up all of the important stuff
-
+set.seed(93093) # to set seeds for all bayes runs
 dir.create("out")
 dir.create("out/model_runs")
 dir.create("out/loo")
@@ -72,10 +72,13 @@ run_table = tibble(
     formula = model_formulas) %>% 
   mutate(priors = map(model_txt, determine_prior),
          id = 1:n(), name = paste0("combo_run_", id),
-         adapt_delta = .95)
+         adapt_delta = .95, 
+         # Create rng seeds for model
+         rng_seed = purrr::rdunif(n(), as.integer(2L ^ 31 - 1)))
 write_rds(run_table, path = "model_settings.rds")
 
 # Write job file
+exec_cmd = "docker_stan" # "Rscript"
 run_script = "R/run_hurdle.r"
-paste("Rscript", run_script, 1:nrow(run_table)) %>% 
+paste(exec_cmd, run_script, 1:nrow(run_table)) %>% 
   write_lines("run_hurdle.job")

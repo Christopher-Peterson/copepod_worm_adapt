@@ -25,6 +25,7 @@ run_hurdle_model = function(formula, priors, name,
   invisible(model_fit)
 }
 
+set.seed(run_settings$rng_seed) # make random numbers reproduceable
 ad = .99 #run_settings$adapt_delta
 fit = run_hurdle_model(run_settings$formula[[1]], run_settings$priors[[1]], 
                        run_settings$name, 
