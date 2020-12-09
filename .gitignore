@@ -4,6 +4,9 @@
 
 # Session Data files
 .RData
+out/top_models/*
+out/hurdle_models/*
+
 
 # User-specific files
 .Ruserdata
