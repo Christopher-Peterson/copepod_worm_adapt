@@ -2,7 +2,7 @@
 # It should be run from the command line once for each model combo.
 suppressPackageStartupMessages({
   library(dplyr);library(tidyr); library(purrr); library(tibble); 
-  library(readr); library(brms); library(loo)
+  library(readr); library(brms); library(loo); library(withr)
 })
 N_CORES = 4
 args = commandArgs(TRUE)
@@ -12,6 +12,14 @@ run_settings = read_rds("model_settings.rds")[model_num,]
 copepods = read_csv("data/chapter2.copepods.cleaned.csv") %>% 
   mutate(native = cop.lake == worm.lake,
          genus = if_else(cop.lake %in% c("gos", "ech"), "A", "M" )) # This is where you'd want to define "genus"
+
+
+# Use withr to set makevars that will force rstan to compile w/ g++
+withr::local_makevars(
+  CXX14FLAGS = "-O3 -march=native -mtune=native -fPIC",
+  CXX14= "g++"
+)
+
 
 ## Function to run models ====================
 run_hurdle_model = function(formula, priors, name,
@@ -29,7 +37,7 @@ run_hurdle_model = function(formula, priors, name,
 set.seed(run_settings$rng_seed) # make random numbers reproduceable
 ad = .99 #run_settings$adapt_delta
 fit = run_hurdle_model(run_settings$formula[[1]], run_settings$priors[[1]], 
-                       run_settings$name, 
+                       run_settings$name, #iter = 100,
                        control = list(adapt_delta = ad))
 
 # out = capture.output(try(run_hurdle_model(run_settings$formula[[1]], run_settings$priors[[1]], 
