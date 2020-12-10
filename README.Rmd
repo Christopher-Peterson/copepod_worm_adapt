@@ -17,6 +17,9 @@ Scripts for the Bayesian hurdle models in this manuscript (add details on submis
 
 ## Instructions
 
+#Datasets: (added by Will Shim)
+There are 2 datasets in here: "chapter2.copepods.cleaned.Aug2020.csv" and "chapter2.copepods.cleaned.csv". They are both identical except that the latter one had a few extra space/tabs for a few individuals in the numb.worm column added by mistake during data collection. I have modified prep_runs.r and run-hurdle.r to accept the first dataset (i.e. chapter2.copepods.cleaned.Aug2020.csv).   
+
 ### TACC setup
 
 Part of this uses TACC, though it could probably be run on a different HPC system. This is configured for **Stampede2**.
