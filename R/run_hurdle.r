@@ -9,10 +9,7 @@ args = commandArgs(TRUE)
 model_num = as.integer(args)
 run_settings = read_rds("model_settings.rds")[model_num,]
 
-copepods = read_csv("data/chapter2.copepods.cleaned.Aug2020.csv") %>% 
-  mutate(native = cop.lake == worm.lake,
-         genus = if_else(cop.lake %in% c("gos", "ech"), "A", "M" )) # This is where you'd want to define "genus"
-
+copepods = read_csv("data/clean_data_for_bayes.R") 
 
 # Use withr to set makevars that will force rstan to compile w/ g++
 withr::local_makevars(
