@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
 N_CORES = 4
 args = commandArgs(TRUE) 
 model_num = args[1] %>% as.integer()
-iter      = args[2] %>% as.integer() %|% 2000
+iter      = args[2] %>% as.integer() %|% 2000L
 
 run_settings = read_rds("model_settings.rds")[model_num,]
 
