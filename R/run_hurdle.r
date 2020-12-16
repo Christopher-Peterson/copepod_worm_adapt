@@ -2,11 +2,14 @@
 # It should be run from the command line once for each model combo.
 suppressPackageStartupMessages({
   library(dplyr);library(tidyr); library(purrr); library(tibble); 
-  library(readr); library(brms); library(loo); library(withr)
+  library(readr); library(brms); library(loo); library(withr);
+  library(rlang)
 })
 N_CORES = 4
-args = commandArgs(TRUE)
-model_num = as.integer(args)
+args = commandArgs(TRUE) 
+model_num = args[1] %>% as.integer()
+iter      = args[2] %>% as.integer() %|% 2000
+
 run_settings = read_rds("model_settings.rds")[model_num,]
 
 copepods = read_csv("data/chapter_2_copepod_for_bayes.csv") 
@@ -34,7 +37,7 @@ run_hurdle_model = function(formula, priors, name,
 set.seed(run_settings$rng_seed) # make random numbers reproduceable
 ad = .99 #run_settings$adapt_delta
 fit = run_hurdle_model(run_settings$formula[[1]], run_settings$priors[[1]], 
-                       run_settings$name, #iter = 100,
+                       run_settings$name, iter = iter,
                        control = list(adapt_delta = ad))
 
 # out = capture.output(try(run_hurdle_model(run_settings$formula[[1]], run_settings$priors[[1]], 
