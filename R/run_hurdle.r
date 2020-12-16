@@ -9,7 +9,7 @@ args = commandArgs(TRUE)
 model_num = as.integer(args)
 run_settings = read_rds("model_settings.rds")[model_num,]
 
-copepods = read_csv("data/clean_data_for_bayes.R") 
+copepods = read_csv("data/chapter_2_copepod_for_bayes.csv") 
 
 # Use withr to set makevars that will force rstan to compile w/ g++
 withr::local_makevars(
