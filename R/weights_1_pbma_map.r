@@ -14,12 +14,11 @@ library(dplyr)
 run_settings = read_rds("model_settings.rds")
 argv = commandArgs(TRUE)
 
-FILE_ID = argv[1]
-SEED = argv[2] %>% as.numeric()
+SEED = argv[1] %>% as.numeric()
 
 
 dir.create("out/pbma_weights")
-out_file = file.path("out/pbma_weights", paste0("pbma_part_", "FILE_ID", ".rds"))
+out_file = file.path("out/pbma_weights", paste0("pbma_part_seed_", "SEED", ".rds"))
 
 loo_file_names = glue("out/loo/{run_settings$name}.rds")
 
