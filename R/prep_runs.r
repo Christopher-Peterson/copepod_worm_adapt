@@ -55,11 +55,20 @@ model_formulas = model_formulas_txt %>%
 ### Set Priors ===========
 
 # One challenge is determining what effects are present
+detect_rand_eff = function(val) {
+  grepl("plate", x = val, fixed = TRUE) |
+    grepl("worm.fam", x = val, fixed = TRUE)
+}
+detect_fixed_eff = function(val) {
+  grepl("lake", x = val, fixed = TRUE) | 
+  grepl("native", x = val, fixed = TRUE) |
+  grepl("genus", x = val, fixed = TRUE)
+}
 determine_prior = function(.x){
-  re_hurdle = grepl("plate", x = .x$hu, fixed = TRUE) | grepl("worm.fam", x = .x$hu, fixed = TRUE)
-  re_pois = grepl("plate", x = .x$pois, fixed = TRUE) | grepl("worm.fam", x = .x$pois, fixed = TRUE)
-  b_hurdle = grepl("lake", x = .x$hu, fixed = TRUE)|grepl("native", x = .x$hu, fixed = TRUE) | grepl("genus", x = .x$hu, fixed = TRUE)
-  b_pois = grepl("lake", x = .x$pois, fixed = TRUE)|grepl("native", x = .x$pois, fixed = TRUE)  | grepl("genus", x = .x$hu, fixed = TRUE)
+  re_hurdle = detect_rand_eff(.x$hu)
+  re_pois   = detect_rand_eff(.x$pois)
+  b_hurdle  = detect_fixed_eff(.x$hu)
+  b_pois    = detect_fixed_eff(.x$pois)
   
   prior = prior_string("normal(0, 6)", class = "Intercept") #the prior in the intercept always has to be bigger than any other priors below 
   if(isTRUE(re_hurdle)) prior = prior + prior_string("student_t(7, 0, 1)", class = "sd", dpar = "hu")
