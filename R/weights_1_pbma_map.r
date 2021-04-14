@@ -45,7 +45,7 @@ pbma_func = function(iter, lpd_mat =loo_lpd_matrix,  ...) {
 set.seed(SEED)
 
 rough_weights_list = parallel::mclapply(seq_len(N_CORES), 
-                                           pseudo_bma_weights, mc.cores = N_CORES,
+                                           pbma_func, mc.cores = N_CORES,
                                            lpd_mat = loo_lpd_matrix, BB_n = N_REPS)
 pbma_weights = rowMeans(do.call(cbind, unclass(rough_weights_list)))
 write_rds(pbma_weights, out_file)
