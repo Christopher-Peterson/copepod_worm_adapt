@@ -90,7 +90,7 @@ run_table = tibble(
          adapt_delta = .95, 
          # Create rng seeds for model
          rng_seed = purrr::rdunif(n(), as.integer(2L ^ 31 - 1)))
-write_rds(run_table, path = "model_settings.rds")
+write_rds(run_table, file = "model_settings.rds")
 
 # Write job file
 exec_cmd = "docker_stan" # "Rscript"
