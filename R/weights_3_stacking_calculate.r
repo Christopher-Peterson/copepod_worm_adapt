@@ -1,18 +1,31 @@
 # Runs full bayesian stacking on the subset of models with decent PBMA+ weights
 
 N_CORES = 48
-library(readr)
-library(purrr)
-library(dplyr)
-library(glue)
-library(loo)
+suppressPackageStartupMessages({
+  library(readr)
+  library(purrr)
+  library(dplyr)
+  library(glue)
+  library(rlang)
+})
 
-loo_file_names = read_lines("out/loo_files.txt")
-
-loo_files = parallel::mclapply(loo_file_names, read_rds, mc.cores = N_CORES)
+if(!exists("argv")) argv <- commandArgs(TRUE)
+seed = argv[1] %>% as.integer() %|% 572806L
+threshold = argv[2] %>% as.numeric() %|% 1e-5
 
 options(mc.cores = N_CORES)
-loo_weights = loo_model_weights(loo_files2)
+source("R/weights_functions.r")
+
+# Read results from previous version
+first_pass = fs::dir_ls("out/stacking_weight_chunks", glob = "*rds") %>% 
+  map_dfr(read_rds) %>% 
+# Filter them down
+  filter(weight >= threshold)
+
+loo_lpd_matrix = read_loo_matrix(first_pass$file_name, cores = N_CORES)
+
+loo_weights = stacking_weights_fast(loo_lpd_matrix, optim_method = "BFGS", optim_control = list()) 
+
 
 loo_weight_df =  tibble(weight = as.numeric(loo_weights), name = nms) %>% 
   left_join(run_settings, by = "name") %>%  
