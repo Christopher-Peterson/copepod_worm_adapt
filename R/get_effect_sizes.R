@@ -14,27 +14,39 @@ library(glue)
 # because there's so many rows of data
 
 # read the first few rows
-stacked_draws_col = read_csv("out/stacked_draws.csv", n_max = 3)
 
-# Define input column specification, replacing NA's with logicals
-stacked_colspec = map_chr(stacked_draws_col, ~{
-    type = typeof(.x)
-    if(type == "logical") return("d")
-    substr(type, 1, 1)
-  }) %>% 
-  paste(collapse = "")
-# Read the full data
-stacked_draws = read_csv("out/stacked_draws.csv",col_types = stacked_colspec)
+stacked_draws = read_rds( "out/combined_draws_df.rds")
+
+# stacked_draws_col = read_csv("out/stacked_draws.csv", n_max = 3)
+# 
+# # Define input column specification, replacing NA's with logicals
+# stacked_colspec = map_chr(stacked_draws_col, ~{
+#     type = typeof(.x)
+#     if(type == "logical") return("d")
+#     substr(type, 1, 1)
+#   }) %>% 
+#   paste(collapse = "")
+# # Read the full data
+# stacked_draws = read_csv("out/stacked_draws.csv",col_types = stacked_colspec)
 
 # Utility function; Names factors based on parm names
 name_factors = function(x) {
   case_when(
     str_detect(x,"r_worm.fam") ~ "Worm Family (RE)",
     str_detect(x,"r_plate") ~  "Plate (RE)",
+    str_detect(x, fixed(":worm.lake")) ~ "Copepod x Worm Lake Interaction",
+    str_detect(x, fixed(":genus")) ~ "Genus x Worm Lake Interaction",
+    str_detect(x, fixed("genus")) ~ "Genus",
     str_detect(x,"cop.lake") ~ "Copepod Lake",
     str_detect(x,"worm.lake") ~ "Worm Lake",
     str_detect(x,"native") ~    "Native")
 }
+factor_table = tibble(
+  parm = names(stacked_draws) %>% str_remove("b_hu_") %>% 
+    str_remove("b_") ) %>% 
+  mutate( factor = name_factors(parm) ) %>%
+  filter(!is.na(factor))
+
 #####################################################
 # split data up by model component 
   # (hu = proportion model, no hu = count),
@@ -49,17 +61,17 @@ stacked_draws_relevant = # remove random effects & other unnecessary things
                            -contains("r_plate")) 
 
 stacked_draws_prop = stacked_draws_relevant %>% 
-  select(1:3, model, contains("_hu"))
+  select(model, contains("_hu"), .chain, .iteration, .draw)
 stacked_draws_count = stacked_draws_relevant %>% 
   select(-contains("_hu"))
 
-# These next lines pivot the data into along form, 
+# These next lines pivot the data into a long form, 
 # calculate marginal effects, 
   # which are basically g^-1( beta + Intercept )
 # Then standardizes some formatting
 
 long_draws_count = stacked_draws_count %>% 
-  select(-model, -starts_with("sd_"), -(1:3)) %>% 
+  select(-model, -starts_with("sd_"), -starts_with(".")) %>% 
   rename(Intercept = b_Intercept) %>% 
   mutate(.id = 1:n()) %>% 
   pivot_longer(-c(.id, Intercept),
@@ -69,11 +81,11 @@ long_draws_count = stacked_draws_count %>%
   mutate(absent = is.na(value)) %>% 
   mutate(linear_value = exp(Intercept + value)) %>% 
   select(-value) %>% 
-  mutate(factor = name_factors(parm),
-         component = "count") 
+  left_join(factor_table, by = "parm") %>% 
+  mutate(component = "count") 
 
 long_draws_prop = stacked_draws_prop %>% 
-  select(-model, -starts_with("sd_"), -(1:3)) %>% 
+  select(-model, -starts_with("sd_"), -starts_with(".")) %>% 
   rename(Intercept = b_hu_Intercept) %>% 
   mutate(.id = 1:n()) %>% 
   pivot_longer(-c(.id, Intercept),
@@ -83,8 +95,8 @@ long_draws_prop = stacked_draws_prop %>%
   mutate(absent = is.na(value)) %>% 
   mutate(linear_value = gtools::inv.logit(Intercept + value)) %>% 
   select(-value) %>% 
-  mutate(factor = name_factors(parm),
-         component = "prop") 
+  left_join(factor_table, by = "parm") %>% 
+  mutate(component = "prop") 
 
 long_draws_count_r = stacked_draws %>% 
   select(Intercept = b_Intercept, 
@@ -96,26 +108,37 @@ long_draws_count_r = stacked_draws %>%
   mutate(absent = is.na(value)) %>% 
   mutate(linear_value = exp(Intercept + value)) %>% 
   select(-value) %>% 
-  mutate(factor = name_factors(parm),
-         component = "count") 
+  left_join(factor_table, by = "parm") %>% 
+  mutate(component = "count") 
 
 
 long_draws_prop_r = stacked_draws %>% 
   select(Intercept = b_hu_Intercept, 
-         starts_with("r_"), contains("_hu")) %>% 
+         starts_with("r_") & contains("_hu") ) %>% 
   mutate(.id = 1:n()) %>% 
   pivot_longer(-c(.id,Intercept),
                names_to = "parm",
                values_to = "value") %>% 
   mutate(absent = is.na(value)) %>% 
   mutate(linear_value = gtools::inv.logit(Intercept + value)) %>% 
-  select(-value) %>% 
-  mutate(factor = name_factors(parm),
-         component = "prop") 
-
-
+  select(-value) %>%
+  left_join(factor_table, by = "parm") %>% 
+  mutate(component = "prop") 
+long_draws_list = lst(long_draws_prop_r, long_draws_count_r,
+    long_draws_prop, long_draws_count) 
+long_draws_list %>% write_rds("out/long_draws_tmp.rds")
+# long_draws_list = read_rds("out/long_draws_tmp.rds")
 # Pull all of the marginals together
-nearly_full_draws_marginal = long_draws_prop %>%
+# long_draws_list$long_draws_prop = long_draws_list$long_draws_prop %>%
+#   select(-factor) %>%
+#   left_join(factor_table, by = "parm")
+# long_draws_list$long_draws_count = long_draws_list$long_draws_count %>%
+#   select(-factor) %>%
+#   left_join(factor_table, by = "parm")
+
+attach(long_draws_list)
+
+nearly_full_draws_marginal =  long_draws_prop %>%
   # Add in the reference class marginals
   mutate(linear_value = gtools::inv.logit(Intercept),
          parm = NA_character_) %>% distinct() %>% 
@@ -128,77 +151,280 @@ nearly_full_draws_marginal = long_draws_prop %>%
               mutate(linear_value = exp(Intercept),
                      parm = NA_character_) %>% distinct()) %>% 
   filter(!is.na(factor)) # Remove extra parms that got in
+nearly_full_draws_marginal %>% write_rds("out/nearly_full_effect_draws_marg.rds")
 
+loo_draw_ids = read_rds("out/loo_draw_ids.rds")
+draw_details = loo_draw_ids %>% select(name, model_txt, draw_list) %>%
+  unchop(draw_list) %>% mutate(.draw = 1:n()) %>% 
+  select(-draw_list) %>% chop(.draw) %>% 
+  unnest_wider(model_txt)
+
+### Pool Worm Lake & Worm Family ####
 # For count models where both worm lake & family are present, 
 # create a combined worm lake + family
-worm_fam_count_ids = nearly_full_draws_marginal %>% 
-  filter(factor %in% c("Worm Lake", "Worm Family (RE)"),
-         component == "count") %>% 
-  select(-linear_value, - parm) %>% 
-  distinct() %>% 
-  pivot_wider(names_from = factor, values_from = absent) %>% 
-  filter(!(`Worm Lake` | `Worm Family (RE)`)) %>% 
-  pull(.id)
+get_joint_worm_draw_ids = function(details) {
+  details %>% 
+    unchop(.draw) %>% group_by(model) %>% chop(.draw) %>% 
+    ungroup() %>% 
+    filter(str_detect(model, fixed("worm.lake")),
+           str_detect(model, fixed("(1|worm.fam)"))) %>% 
+    pull(.draw) %>% unlist()
+}
+joint_worm_ids = list(
+  count = draw_details %>% 
+    select(model = pois, .draw),
+  prop = draw_details %>% 
+    select(model = hu, .draw)
+) %>% map(get_joint_worm_draw_ids)
 
 # assign a lake to a parameter
 assign_wormlake = function(.x) {
-  case_when(
-    is.na(.x)            | grepl("fam[boo", .x, fixed = TRUE) ~ "boot",
-    .x == "worm.lakeech" | grepl("fam[ech", .x, fixed = TRUE) ~ "echo",
-    .x == "worm.lakegos" | grepl("fam[g", .x, fixed = TRUE)   ~ "gos",
-    TRUE ~ NA_character_)
+  # browser()
+  .x = str_remove(.x, "__hu")
+  matcher = tibble(.x = unique(.x, )) %>% 
+    mutate(out = case_when(
+      is.na(.x)            | grepl("fam[boo", .x, fixed = TRUE) ~ "boot",
+      .x == "worm.lakeech" | grepl("fam[ech", .x, fixed = TRUE) ~ "echo",
+      .x == "worm.lakegos" | grepl("fam[g", .x, fixed = TRUE)   ~ "gos",
+      TRUE ~ NA_character_)
+    )
+  tibble(.x) %>% left_join(matcher, ".x") %>% pull(out)
 }
 
-worm_lake_fam_dat = nearly_full_draws_marginal %>% 
-  filter(.id %in% worm_fam_count_ids, component == "count",
-         factor %in% c("Worm Lake", "Worm Family (RE)")) %>% 
-  mutate(worm_lake = assign_wormlake(parm),
-         value = log(linear_value) - Intercept) %>% 
-  select(-parm, -linear_value) %>% 
-  pivot_wider(names_from = factor, values_from = value,
-              values_fn = list) %>% 
-  unchop(c(`Worm Lake`, `Worm Family (RE)`)) %>% 
-  mutate(linear_value = exp(Intercept + `Worm Lake` + `Worm Family (RE)`)) %>% 
-  select(-`Worm Lake`, -`Worm Family (RE)`) %>% 
-  rename(parm = worm_lake) %>% 
-  mutate(factor = "Worm Lake + Family")
-  
-# Now I need to fill in the missing values so that proportions are correct
-worm_lake_fam_missing = 
-  nearly_full_draws_marginal %>% 
-  filter(.id %in% worm_fam_count_ids, component == "count",
-         factor %in% c("Worm Lake", "Worm Family (RE)")) %>% 
-  bind_rows(
-    nearly_full_draws_marginal %>% 
-      filter(! (.id %in% worm_fam_count_ids), 
-             component == "count",
-             factor == c("Worm Family (RE)")) %>% 
-      mutate(factor = "Worm Lake + Family") %>% 
-      distinct()
-  ) %>% mutate(absent = TRUE, linear_value = NA_real_)
-  
+# Not sure if this is working for interactions?
 
-# also add a worm (pooled) option
-pool_worms = function(data) {
-  worm_dat = data %>%  
-    filter(component == "count",
-      factor %in% c("Worm Lake", "Worm Lake + Family", "Worm Family (RE)"))
-  pooled_worm = worm_dat %>% filter(!absent) %>% 
-    mutate(factor = "Worm (pooled)")
-  new_dat = worm_dat %>% filter(! .id %in% pooled_worm$.id) %>% 
-    mutate(factor = "Worm (pooled)") %>% distinct() %>% 
-    bind_rows(pooled_worm)
-  bind_rows(data, new_dat)
+combine_worm_data_levels = function(.data = nearly_full_draws_marginal,
+                                    comp = "count", id_list = joint_worm_ids) {
+  ids = id_list[[comp]]
+  g = switch(comp, count = log, prop = gtools::logit)
+  inv_g = switch(comp, count = exp, prop = gtools::inv.logit)
+  
+  # Subset of the data that has both worm factors
+  worm_data = .data %>% 
+    filter(component == comp, 
+           factor %in% c("Worm Lake", "Worm Family (RE)")) %>% 
+    mutate(worm_lake = assign_wormlake(parm)) %>% 
+    select(-parm) 
+  joint_data = worm_data %>% filter(.id %in% ids)
+  
+  # Join the worm factors together (by lake) and get the combined linear value
+  lake_family_data = joint_data %>% 
+    mutate(value = g(linear_value) - Intercept) %>% 
+    distinct() %>% 
+    select(-linear_value) %>% 
+    pivot_wider(names_from = factor, values_from = value,
+                values_fn = list) %>% 
+    unchop(c(`Worm Lake`, `Worm Family (RE)`)) %>% 
+    mutate(linear_value = inv_g(Intercept + `Worm Lake` + `Worm Family (RE)`)) %>% 
+    select(-`Worm Lake`, -`Worm Family (RE)`) %>% 
+    mutate(factor = "Worm Lake + Family")  
+  
+  # Now I need to fill in the missing values so that proportions are correct
+  # I'm not really sure what this is doing...
+  # 
+  lake_family_missing = worm_data %>% filter(! .id %in% ids) %>% 
+    filter(factor == "Worm Family (RE)") %>% 
+    mutate(factor = "Worm Lake + Family") %>% 
+    distinct() %>% 
+    mutate(absent = TRUE, linear_value = NA_real_)
+  
+  # browser()
+  lake_family_combined = bind_rows(lake_family_missing, lake_family_data) %>% 
+    rename(parm = worm_lake) 
+  
+  # Define worms (pooled), a factor that includes all of the worm stuff 
+  # present in that model
+  pooled_worm_data = worm_data %>% 
+    filter(!absent, ! .id %in% ids) %>%
+    bind_rows(lake_family_data %>% filter(!absent)) %>% 
+    mutate(factor = "Worm (pooled)") %>% 
+    distinct()
+    
+  no_worm_data = worm_data %>% 
+    filter(factor == "Worm Lake", !.id %in% ids) %>% 
+    mutate(factor = "Worm (pooled)") %>% distinct()
+  
+  pooled_worm_combined = bind_rows(pooled_worm_data, no_worm_data) %>% 
+    distinct()
+  
+  bind_rows(.data, pooled_worm_combined,
+            lake_family_data)
 }
 
-full_draws_marginal = nearly_full_draws_marginal %>% 
-  # Remove lake_fam ids
-  filter(!(component == "count" &
-           .id %in% worm_fam_count_ids &
-           factor %in% c("Worm Lake", "Worm Family (RE)"))) %>% 
-  bind_rows(worm_lake_fam_missing, worm_lake_fam_dat) %>% 
-  pool_worms()
+full_draws_with_worm = nearly_full_draws_marginal %>% 
+  combine_worm_data_levels("count") %>% 
+  combine_worm_data_levels("prop")
+
+
+combine_worm_data_levels = function(.data = nearly_full_draws_marginal,
+                                    comp = "count", id_list = joint_worm_ids) {
+  ids = id_list[[comp]]
+  g = switch(comp, count = log, prop = gtools::logit)
+  inv_g = switch(comp, count = exp, prop = gtools::inv.logit)
   
+  # Subset of the data that has both worm factors
+  worm_data = .data %>% 
+    filter(component == comp, 
+           factor %in% c("Worm Lake", "Worm Family (RE)")) %>% 
+    mutate(worm_lake = assign_wormlake(parm)) %>% 
+    select(-parm) 
+  joint_data = worm_data %>% filter(.id %in% ids)
+  
+  # Join the worm factors together (by lake) and get the combined linear value
+  lake_family_data = joint_data %>% 
+    mutate(value = g(linear_value) - Intercept) %>% 
+    distinct() %>% 
+    select(-linear_value) %>% 
+    pivot_wider(names_from = factor, values_from = value,
+                values_fn = list) %>% 
+    unchop(c(`Worm Lake`, `Worm Family (RE)`)) %>% 
+    mutate(linear_value = inv_g(Intercept + `Worm Lake` + `Worm Family (RE)`)) %>% 
+    select(-`Worm Lake`, -`Worm Family (RE)`) %>% 
+    mutate(factor = "Worm Lake + Family")  
+  
+  # Now I need to fill in the missing values so that proportions are correct
+  # I'm not really sure what this is doing...
+  # 
+  lake_family_missing = worm_data %>% filter(! .id %in% ids) %>% 
+    filter(factor == "Worm Family (RE)") %>% 
+    mutate(factor = "Worm Lake + Family") %>% 
+    distinct() %>% 
+    mutate(absent = TRUE, linear_value = NA_real_)
+  
+  # browser()
+  lake_family_combined = bind_rows(lake_family_missing, lake_family_data) %>% 
+    rename(parm = worm_lake) 
+  
+  # Define worms (pooled), a factor that includes all of the worm stuff 
+  # present in that model
+  pooled_worm_data = worm_data %>% 
+    filter(!absent, ! .id %in% ids) %>%
+    bind_rows(lake_family_data %>% filter(!absent)) %>% 
+    mutate(factor = "Worm (pooled)") %>% 
+    distinct()
+  
+  no_worm_data = worm_data %>% 
+    filter(factor == "Worm Lake", !.id %in% ids) %>% 
+    mutate(factor = "Worm (pooled)") %>% distinct()
+  
+  pooled_worm_combined = bind_rows(pooled_worm_data, no_worm_data) %>% 
+    distinct()
+  
+  bind_rows(.data, pooled_worm_combined,
+            lake_family_data)
+}
+### Pool Copepods ####
+# full_draws_with_worm = read_rds("out/full_effect_size_draws_marginal.rds")
+
+get_joint_cop_draw_ids = function(details) {
+  # browser()
+  details %>% 
+    unchop(.draw) %>% group_by(model) %>% chop(.draw) %>% 
+    ungroup() %>% 
+    filter(str_detect(model, fixed("cop.lake")),
+           str_detect(model, fixed("genus"))) %>% 
+    pull(.draw) %>% unlist()
+}
+joint_cop_ids = list(
+  count = draw_details %>% 
+    select(model = pois, .draw),
+  prop = draw_details %>% 
+    select(model = hu, .draw)
+) %>% map(get_joint_cop_draw_ids)
+
+
+# full_draws_with_worm %>% filter(!absent, factor == "Copepod Lake") %>% arrange(.id, parm)
+# 
+# full_draws_with_worm %>% filter(!absent, factor == "Genus") %>% arrange(.id, parm)
+assign_copgenus = function(parm) {
+  # browser()
+  genus_key = tribble(
+    ~"parm",       ~"out",
+    "genusM"         , "M", 
+    "Genus",           "A",
+    "cop.lakeech"    , "A",
+    "cop.lakegos"    , "A",
+    "cop.lakelau"    , "M",
+    "cop.lakerob"    , "M",
+    "Copepod Lake"  , "A"
+  )
+  tibble(parm = parm) %>% 
+    left_join(genus_key, "parm") %>% pull(out)
+}
+combine_cop_data_levels = function(.data = nearly_full_draws_marginal,
+                                    comp = "count", id_list = joint_cop_ids) {
+  ids = id_list[[comp]]
+  g = switch(comp, count = log, prop = gtools::logit)
+  inv_g = switch(comp, count = exp, prop = gtools::inv.logit)
+  
+  # if(comp == "prop") browser()
+  # NA is either boom (M) or (A)
+  cop_data = .data %>% 
+    filter(component == comp, 
+           factor %in% c("Copepod Lake", "Genus")) %>% 
+    # For NA's in parm, key it by the factor name
+    # to distinguish when mergin w/ the genus key
+    mutate(parm = coalesce(parm, factor),
+           Genus_ID = assign_copgenus(parm)) %>% 
+    select(-parm) 
+  # Subset of the data that has both copepod factors
+  joint_data = cop_data %>% filter(.id %in% ids)
+  
+  # Join the copepod factors together (by lake) and get the combined linear value
+  lake_genus_data = joint_data %>% 
+    mutate(value = g(linear_value) - Intercept) %>% 
+    distinct() %>% 
+    select(-linear_value) %>% 
+    pivot_wider(names_from = factor, values_from = value,
+                values_fn = list) %>% 
+    unchop(c(Genus, `Copepod Lake`)) %>% 
+    mutate(linear_value = inv_g(Intercept + `Copepod Lake` + `Genus`)) %>% 
+    select(-Genus, -`Copepod Lake`) %>% 
+    mutate(factor = "Copepod Genus + Lake")  
+  
+  # Now I need to fill in the missing values so that proportions are correct
+  # I'm not really sure what this is doing...
+   
+  lake_genus_missing = cop_data %>% filter(! .id %in% ids) %>% 
+    filter(factor == "Copepod Lake") %>% 
+    mutate(factor = "Copepod Genus + Lake")  %>% 
+    distinct() %>% 
+    mutate(absent = TRUE, linear_value = NA_real_)
+  
+  # browser()
+  lake_genus_combined = bind_rows(lake_genus_missing, lake_genus_data) %>% 
+    rename(parm = Genus_ID)  # Not sure How I feel about this one...
+  
+  # Define worms (pooled), a factor that includes all of the worm stuff 
+  # present in that model
+  pooled_cop_data = cop_data %>% 
+    filter(!absent, ! .id %in% ids) %>%
+    bind_rows(lake_genus_data %>% filter(!absent)) %>% 
+    mutate(factor = "Copepod (pooled)") %>% 
+    distinct()
+  
+  no_cop_data = cop_data %>% 
+    filter(factor == "Genus", absent) %>% 
+           # !.id %in% ids) %>% 
+    mutate(factor = "Copepod (pooled)") %>% distinct()
+  
+  pooled_cop_combined = bind_rows(pooled_cop_data, no_cop_data) %>% 
+    distinct() %>% rename(parm = Genus_ID)
+  # Counts are 5 for lake_genus, 2 for the others, which is what they should be
+  bind_rows(.data, pooled_cop_combined,
+            lake_genus_data)
+}
+full_draws_marginal = full_draws_with_worm %>% 
+  combine_cop_data_levels("count") %>% 
+  combine_cop_data_levels("prop") %>% 
+  distinct()
+# full_draws_marginal = full_draws_with_worm # consider doing the same for genus + copepod lake
+
+full_draws_marginal %>% write_rds("out/full_effect_size_draws_marginal.rds")  
+
+if(exists("full_draw_marginal")) rep("======= DONE ========\n", 10)
+# full_draws_marginal = read_rds("out/full_effect_size_draws_marginal.rds")  
+
 
 ############################################
 # Calculate effect size CI's & inclusion frequencies, 
@@ -208,74 +434,133 @@ full_draws_marginal = nearly_full_draws_marginal %>%
 # Calculate effect sizes for each factor & sample
 full_effect_sizes = full_draws_marginal %>% 
   group_by(component, factor, .id) %>% 
+  # distinct() %>% 
   summarise(effect_size = sd(linear_value, na.rm = TRUE),
             absent = any(is.na(linear_value)))
 
+write_rds(full_effect_sizes, "out/full_effect_sizes.rds")
+# full_effect_sizes = read_rds("out/full_effect_sizes.rds")
 
 get_ci = function(.x, probs = c(.025, .05, .25, .5, .75, .95, .975)){
   quants = quantile(.x, probs, na.rm = TRUE)
   names(quants) = paste0("Q", substring(probs, 2))
   tibble(!!!quants)
 }
-
+# N_DRAWS = draw_details %>% unchop(.draw) %>% nrow()
 # Get the credible intervals of effect sizes & the frequency of the factor's inclusion in models
 effect_size_ci = full_effect_sizes %>% 
   select(-.id) %>% 
   chop(c(effect_size, absent)) %>% 
   mutate(
     frequency = 1 - map_dbl(absent, mean),
+    # frequency2 = 1 - map_dbl(absent, sum)/N_DRAWS,
     ci = map(effect_size, get_ci)
   ) %>% 
   select(-effect_size, -absent) %>% unnest(ci) %>% 
   ungroup() %>% 
   arrange(component, desc(frequency), factor) 
 
+
 # Save it
 write_csv(effect_size_ci, "out/marginal_effect_sizes.csv")  
+
+effect_size_ci = read_csv("out/marginal_effect_sizes.csv")  
 
 total_n = n_distinct(full_effect_sizes$.id)
 
 # Format for manuscript
-effect_size_ci %>% 
+pretty_ci = effect_size_ci %>% 
+  filter(!factor %in% c("Worm Lake + Family", "Copepod Genus + Lake")) %>% # Something is bugged with that one
   select(component:frequency, median = Q.5, lo = Q.025, hi = Q.975) %>% 
-  mutate(across(median:hi, ~format(round(.x,3), digits = 3))) %>% 
+  mutate(across(frequency:hi, ~format(round(.x,3), digits = 3))) %>% 
   mutate(CI = glue("[{lo}, {hi}]")) %>% 
-  select(-lo, -hi)
+  select(-lo, -hi) %>% 
+  mutate(factor = recode(factor, Genus = "Copepod Genus")) %>% 
+  as.data.frame()
 
-# Parse out whether worm lake, worm family, or both were in the intensity model
-stacked_draws %>% 
-  select(lake = b_worm.lakeech, fam = sd_worm.fam__Intercept) %>% 
-  mutate_all(~!is.na(.x)) %>% 
-  mutate(worm_inclusion = case_when(
-    lake & fam ~ "both",
-    lake ~ "lake",
-    fam ~ "family",
-    TRUE ~ "none")) %>% 
-  group_by(worm_inclusion) %>% 
-  summarise(count = n()) %>% 
-  ungroup() %>% 
-  mutate(freq = count/ sum(count))
+pretty_ci
+pretty_ci %>% write_csv("writing/effect_sizes.csv")
 
+### Results Table of effect sizes ####
+# component                          factor frequency median             CI
+#     count                Copepod (pooled)     0.849  0.640 [0.421, 1.289]
+#     count                   Copepod Genus     0.849  0.621 [0.019, 2.201]
+#     count                   Worm (pooled)     0.817  0.187 [0.027, 1.297]
+#     count                       Worm Lake     0.817  0.182 [0.023, 1.374]
+#     count                    Copepod Lake     0.522  0.503 [0.190, 2.464]
+#     count                      Plate (RE)     0.495  0.095 [0.004, 0.421]
+#     count                          Native     0.473  0.126 [0.005, 0.798]
+#     count                Worm Family (RE)     0.420  0.113 [0.006, 0.575]
+#     count   Genus x Worm Lake Interaction     0.354  0.616 [0.052, 4.309]
+#     count Copepod x Worm Lake Interaction     0.208  0.721 [0.079, 7.482]
+#      prop                Copepod (pooled)     0.871  0.255 [0.213, 0.364]
+#      prop                   Copepod Genus     0.871  0.274 [0.043, 0.385]
+#      prop                   Worm (pooled)     0.840  0.058 [0.020, 0.118]
+#      prop                       Worm Lake     0.840  0.060 [0.018, 0.128]
+#      prop                    Copepod Lake     0.593  0.143 [0.072, 0.242]
+#      prop                      Plate (RE)     0.497  0.032 [0.002, 0.078]
+#      prop                Worm Family (RE)     0.409  0.018 [0.001, 0.060]
+#      prop                          Native     0.372  0.039 [0.002, 0.142]
+#      prop Copepod x Worm Lake Interaction     0.235  0.095 [0.045, 0.164]
+#      prop   Genus x Worm Lake Interaction     0.218  0.053 [0.009, 0.175]
 
+#### Copepod genus effects ####
+copepod_genus_effects = local({
+  # Separate out genus effect size in presence + absence of copepod lake
+  cop_effects = full_effect_sizes %>% 
+    filter(factor %in% c("Copepod Lake", "Genus")) %>% 
+    ungroup() %>% filter(!absent)
+  lake_effects = cop_effects %>% filter(factor == "Copepod Lake")
+  genus_effects = cop_effects %>% filter(factor == "Genus")
+  
+  genus_with_lake = genus_effects %>% 
+    semi_join(lake_effects, by = c("component", ".id")) %>% 
+    mutate(partition = "Lake")
+  genus_without_lake = genus_effects %>% 
+    anti_join(lake_effects, by = c("component", ".id")) %>% 
+    mutate(partition = "No Lake")
+  
+  split_genus_effects = bind_rows(genus_with_lake, genus_without_lake) %>% 
+    select(-absent, -factor) %>% 
+    group_by(component, partition) %>% 
+    select(-.id) %>% 
+    chop(effect_size) %>% 
+    mutate(ci = map(effect_size, get_ci)) %>% 
+    select(-effect_size) %>% unnest(ci) %>% 
+    ungroup()
+  split_genus_effects %>% 
+    select(component, partition, median = Q.5, lo = Q.025, hi = Q.975) %>% 
+    mutate(across(median:hi, ~format(round(.x,3), digits = 3))) %>% 
+    mutate(CI = glue("[{lo}, {hi}]")) %>% 
+    select(-lo, -hi) %>% arrange(component, partition)
+  
+  
+})
+# These are all for genus w/ or w/o cop lake
+# component partition median CI            
+# count     Lake      0.342  [0.011, 2.714]
+# count     No Lake   0.712  [0.518, 0.958]
+# prop      Lake      0.210  [0.031, 0.395]
+# prop      No Lake   0.338  [0.303, 0.375]
 
 # Break down incidence variables by co-occurrence in ensemble
-full_effect_sizes %>% 
-  ungroup() %>% 
-  filter(component == "count", factor != "Copepod Lake") %>% 
-  mutate(included = !absent) %>%
-  select(factor, included, .id) %>% 
-  distinct() %>% 
-  pivot_wider(names_from = factor, values_from = included) %>% 
-  select(-.id) %>% 
-  group_by(across(everything())) %>% 
-  summarise(count = n()) %>% 
-  ungroup() %>% 
-  mutate(freq = count / total_n ) %>% 
-  arrange(desc(freq)) %>% 
-  nest(fcts = 1:4) %>% 
-  mutate(terms = map_chr(fcts, 
-    ~names(.x)[as.logical(.x)] %>% paste(collapse = " + "))) %>% 
-  select(-fcts, -count)
+# full_effect_sizes %>% 
+#   ungroup() %>% 
+#   filter(component == "count", factor != "Copepod Lake") %>% 
+#   mutate(included = !absent) %>%
+#   select(factor, included, .id) %>% 
+#   distinct() %>% 
+#   pivot_wider(names_from = factor, values_from = included) %>% 
+#   select(-.id) %>% 
+#   group_by(across(everything())) %>% 
+#   summarise(count = n()) %>% 
+#   ungroup() %>% 
+#   mutate(freq = count / total_n ) %>% 
+#   arrange(desc(freq)) %>% 
+#   nest(fcts = 1:4) %>% 
+#   mutate(terms = map_chr(fcts, 
+#     ~names(.x)[as.logical(.x)] %>% paste(collapse = " + "))) %>% 
+#   select(-fcts, -count)
 
 ### Include this in the manuscript ####
 
@@ -325,7 +610,8 @@ full_effect_sizes %>%
 
 
 
-
+# Filter out the damn genus:worm.lake interactions
+# 
 
 
 # This tries to parse apart the non-copepod terms for the intensity model:

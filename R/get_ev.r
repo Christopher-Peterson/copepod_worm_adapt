@@ -1,14 +1,17 @@
 # Calculate model-averaged expected value & create plot
 #### Setup ####
-library(readr)
-library(purrr)
-library(tibble)
-library(tidyr)
-library(brms)
-library(dplyr)
-# library(stringr)
-library(ggplot2)
-library(cowplot); theme_set(theme_cowplot())
+suppressPackageStartupMessages({
+  library(readr)
+  library(purrr)
+  library(tibble)
+  library(tidyr)
+  library(brms)
+  library(dplyr)
+  # library(stringr)
+  library(ggplot2)
+  library(cowplot); 
+})
+  theme_set(theme_cowplot())
 
 order_cop_lake = function(cop_lakes) {
   # Convert cop.lake into a factor
@@ -18,11 +21,14 @@ order_cop_lake = function(cop_lakes) {
   rlang::exec(recode, .x = cop_lakes, !!!lake_order) %>%
     factor(levels = lake_order)
 }
-raw_data = read_csv("data/chapter2.copepods.cleaned.csv") %>%
+# raw_data = read_csv("data/chapter2.copepods.cleaned.csv") %>%
+#   mutate(cop.lake = order_cop_lake(cop.lake))
+
+raw_data = read_csv("data/chapter_2_copepod_for_bayes.csv") %>%
   mutate(cop.lake = order_cop_lake(cop.lake))
 
 #### Combine stacking weights, get evs
-source("R/combine_stacking_weights.R")
+source("R/weights_stacking_combine.R")
 #### Read EVs ####
 full_evs = read_csv("out/stacked_evs.csv")
 

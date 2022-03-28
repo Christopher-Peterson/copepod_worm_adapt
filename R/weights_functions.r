@@ -31,7 +31,7 @@ stacking_weights_fast <-
       # objective function: log score
       # stopifnot(length(w) == K - 1)
       w_full <- c(w, 1 - sum(w))
-      cat("iter\n")
+      # cat("iter\n")
       -sum(log(exp_lpd_point %*% w_full))
     }
     

@@ -4,7 +4,7 @@
 
 N_CORES = 48
 N_REPS = 60
-PBMA_CUTOFF_LOG = -20 # CHANGE THIS
+PBMA_CUTOFF_LOG = -100 # CHANGE THIS
 STACKING_CHUNKS = 4L
 
 library(readr)
@@ -15,7 +15,7 @@ library(parallel)
 library(glue)
 library(rlang)
 library(dplyr)
-run_settings = read_rds("model_settings.rds")
+run_settings = read_rds("model_settings_filtered.rds")
 argv = commandArgs(TRUE)
 
 SEED = argv[1] %>% as.numeric() %|% 1234

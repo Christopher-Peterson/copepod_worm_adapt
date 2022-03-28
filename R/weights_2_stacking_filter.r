@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
   library(purrr)
   library(dplyr)
   library(glue)
+  library(tidyr)
   library(rlang)
 })
 
@@ -34,7 +35,7 @@ write_rds(loo_weight_df, output_file)
 
 
 
-run_settings = read_rds("model_settings.rds")
+run_settings = read_rds("model_settings_filtered.rds")
 loo_text_tbl = loo_weight_df %>% 
   select(weight, name, model_txt) %>%
   unnest() %>% unnest() %>%
