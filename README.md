@@ -6,15 +6,19 @@
 These include the data and scripts for the Bayesian hurdle model
 ensemble analysis.
 
-### Datasets
+### Dataset metadata
 
-There are 3 datasets in here: “chapter2.copepods.cleaned.Aug2020.csv”,
-“chapter2.copepods.cleaned.csv”, and “chapter_2\_copepod_for_bayes.csv.”
-They are identical except that the Aug2020 one had a few extra
-space/tabs for a few individuals in the numb.worm column added by
-mistake during data collection. The “for_bayes” version of the dataset
-was modified from the Aug2020 version by a script in the repository, and
-is the one used in the actual analysis.
+The main data is `data/chapter_2_copepod_for_bayes.csv`. It has the
+following columns: The data file has the following columns:
+
+- number: sequential row number
+- cop.lake: Copepod Lake of origin (factor: lau, ech, rob, gos, boo)
+- worm.fam: Worm family; nested within worm.lake (factor)
+- worm.lake: Worm lake of origin (factor: boo, gos, ech)
+- plate: experimental block identifier (factor)
+- numb.worm: number of worms present in copepod (integer)
+- native: Does cop.lake == worm.lake? (logical)
+- genus: Worm genus (factor: M, A)
 
 ## Re-analysis instructions
 
