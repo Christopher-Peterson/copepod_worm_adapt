@@ -6,9 +6,6 @@
 #SBATCH -o logs/cwa_bayes_runs_test.o
 #SBATCH -e logs/cwa_byaes_runs_test.e
 #SBATCH -t 2:00:00
-#SBATCH -A tagmap
-#SBATCH --mail-user=Christopher.R.Peterson@utexas.edu
-#SBATCH --mail-type=fail
 #------------------------------------------------------
 
 # N is number of nodes you want to use
