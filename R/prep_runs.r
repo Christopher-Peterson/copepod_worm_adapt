@@ -1,13 +1,14 @@
 suppressPackageStartupMessages({
   library(dplyr);library(tidyr); library(purrr);
-  library(tibble); library(readr);
+  library(tibble); library(readr); library(rlang);
   library(brms)
 })
-# library(brms)
-# library(loo)
-# library(tidybayes)
-# library(cowplot)
-# This sets up all of the important stuff
+
+argv = commandArgs(TRUE)
+job_file = argv[1] %|% "jobs/run_hurdle.job"
+
+# This sets up the hurdle model run
+
 set.seed(93093) # to set seeds for all bayes runs
 dir.create("out")
 dir.create("out/model_runs")
@@ -96,4 +97,4 @@ write_rds(run_table, file = "model_settings.rds")
 exec_cmd = "docker_stan" # "Rscript"
 run_script = "R/run_hurdle.r"
 paste(exec_cmd, run_script, 1:nrow(run_table)) %>% 
-  write_lines("run_hurdle.job")
+  write_lines(job_file)
