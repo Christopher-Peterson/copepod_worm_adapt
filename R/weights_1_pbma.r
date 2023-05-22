@@ -2,11 +2,7 @@
 # Part 1 is to use PBMA model weights, which are fast & parallelizable but not the best
 # From these, the top portion of models will be selected to do full bayesian stacking
 
-N_CORES = 48
-N_REPS = 60
-PBMA_CUTOFF_LOG = -100 # CHANGE THIS
-STACKING_CHUNKS = 4L
-
+suppressPackageStartupMessages({
 library(readr)
 library(loo)
 library(brms)
@@ -15,11 +11,20 @@ library(parallel)
 library(glue)
 library(rlang)
 library(dplyr)
-run_settings = read_rds("model_settings_filtered.rds")
+})
 argv = commandArgs(TRUE)
-
+# Run arguments
 SEED = argv[1] %>% as.numeric() %|% 1234
 stacking_job = argv[2] %|% "jobs/stacking_p1.job"
+N_CORES = argv[3] %>% as.numeric() %|%  48
+N_REPS = argv[4] %>% as.numeric() %|%  60
+STACKING_CHUNKS = argv[5] %>% as.numeric() %|% 4L
+PBMA_CUTOFF_LOG = argv[6] %>% as.numeric() %|% -100 # CHANGE THIS
+
+
+run_settings = read_rds("model_settings_filtered.rds")
+
+
 
 dir.create("out/pbma_weights")
 out_file = file.path("out/pbma_weights", paste0("pbma_part_seed_", SEED, ".rds"))

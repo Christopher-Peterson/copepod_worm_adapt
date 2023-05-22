@@ -15,5 +15,9 @@
 module load launcher
 export LAUNCHER_PLUGIN_DIR=$LAUNCHER_DIR/plugins
 export LAUNCHER_RMI=SLURM
-export LAUNCHER_JOB_FILE=run_hurdle.job
+export LAUNCHER_JOB_FILE=jobs/run_hurdle.job
+
+# Create the job file & model specifications
+docker_stan R/prep_runs.r $LAUNCHER_JOB_FILE
+# Run them
 $LAUNCHER_DIR/paramrun

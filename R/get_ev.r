@@ -166,7 +166,7 @@ joint_plot = plot_grid(
   ncol = 1, rel_heights = c(1, .6)
   ); ggsave("figures/full_plot.png",joint_plot, 
             width = 6, height = 8, dpi = 300)
-cb_plot = colorblindr::cvd_grid(count_plot + scale_y_continuous(name=""))
+# cb_plot = colorblindr::cvd_grid(count_plot + scale_y_continuous(name=""))
 ggsave("figures/colorblind_plot.png", cb_plot, width = 11, height = 7, dpi = 300)
 
 ###### Old; skip  ####
